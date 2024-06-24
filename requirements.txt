@@ -1,0 +1,8 @@
+ipykernel
+datasets
+transformers[torch]
+pandas
+accelerate
+evaluate
+seqeval
+wandb
