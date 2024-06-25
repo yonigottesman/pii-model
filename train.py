@@ -129,11 +129,12 @@ def train():
     labels = [f"I-{label}" for label in labels] + [f"B-{label}" for label in labels] + ["O"]
     label2id = {label: i for i, label in enumerate(labels)}
     id2label = {v: k for k, v in label2id.items()}
-    pretrained_name = "distilbert-base-uncased"
+    pretrained_name = "distilbert-base-cased"
     tokenizer = AutoTokenizer.from_pretrained(pretrained_name)
     model = AutoModelForTokenClassification.from_pretrained(pretrained_name, num_labels=len(labels), id2label=id2label)
 
     ds = load_dataset("ai4privacy/pii-masking-300k")
+    ds = ds.filter(lambda x: x["language"] == "English", num_proc=4)
     ds = ds.map(
         partial(tokenize, labels2int=label2id, tokenizer=tokenizer, iob=True, ignore_subwords=True),
         batched=False,
@@ -151,11 +152,11 @@ def train():
         num_proc=8,
     ).remove_columns(["offset_mapping"])
     training_arguments = TrainingArguments(
-        output_dir="output2",
-        num_train_epochs=7,
-        eval_steps=5,
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
+        output_dir="output",
+        max_steps=30000,
+        eval_steps=1000,
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=128,
         overwrite_output_dir=True,
         warmup_ratio=0.2,
         learning_rate=2e-5,
@@ -164,17 +165,18 @@ def train():
         eval_strategy="steps",
         load_best_model_at_end=True,
         save_total_limit=1,
-        save_steps=5,
+        save_steps=1000,
         lr_scheduler_type="cosine",
         report_to="wandb",
         push_to_hub=True,
         warmup_steps=3000,
         metric_for_best_model="f1",
-        hub_model_id="freepii",
+        greater_is_better=True,
+        hub_model_id=f"{pretrained_name}-pii-en",
         hub_strategy="every_save",
         hub_private_repo=True,
         run_name=str(uuid.uuid4()),
-        # torch_compile
+        torch_compile=False,
     )
     trainer = Trainer(
         model,
